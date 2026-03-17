@@ -1,0 +1,21 @@
+services:
+  grafana:
+    build: .
+    container_name: grafana-vast-audit
+    env_file:
+      - .env
+    environment:
+      - GF_SERVER_HTTP_PORT=${GRAFANA_PORT:-3000}
+    ports:
+      - "${GRAFANA_PORT:-3000}:${GRAFANA_PORT:-3000}"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${GRAFANA_PORT:-3000}/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  grafana_data:

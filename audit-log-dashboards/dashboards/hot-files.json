@@ -1,0 +1,439 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [
+    {
+      "title": "Overview",
+      "url": "/d/vast-audit-overview",
+      "type": "link"
+    },
+    {
+      "title": "File Lineage",
+      "url": "/d/vast-file-lineage",
+      "type": "link"
+    },
+    {
+      "title": "User IO",
+      "url": "/d/vast-user-io",
+      "type": "link"
+    }
+  ],
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "options": {
+        "mode": "markdown",
+        "content": "# Top N Hot Files\nIdentify the most accessed files by total operations. Filter by protocol, user, and folder path prefix."
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Matching Records",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 2
+      },
+      "id": 1,
+      "targets": [
+        {
+          "format": 0,
+          "rawSQL": "SELECT count(*)\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND starts_with(rpc_type, '${action_prefix}')",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "type": "table",
+      "title": "Top ${topN} Files by Access Count",
+      "gridPos": {
+        "h": 14,
+        "w": 20,
+        "x": 4,
+        "y": 2
+      },
+      "id": 10,
+      "targets": [
+        {
+          "format": 1,
+          "rawSQL": "SELECT path.path AS \"File Path\",\n       COUNT(*) AS \"Total Ops\",\n       COUNT(DISTINCT rpc_type) AS \"Op Types\",\n       COUNT(DISTINCT IF(login_name!='', login_name, 'uid'||cast(uid as VARCHAR))) AS \"Unique Users\",\n       COUNT(DISTINCT protocol) AS \"Protocols\",\n       COALESCE(SUM(num_bytes), 0) AS \"Total Bytes\",\n       ARRAY_JOIN(ARRAY_AGG(DISTINCT rpc_type), ', ') AS \"Operations\",\n       ARRAY_JOIN(ARRAY_AGG(DISTINCT protocol), ', ') AS \"Via Protocols\"\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND starts_with(rpc_type, '${action_prefix}')\n  AND rpc_type NOT IN ('READDIR', 'READDIRPLUS', 'MKDIR', 'RMDIR')\nGROUP BY path.path\nORDER BY COUNT(*) DESC\nLIMIT ${topN}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Bytes"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "custom.width",
+                "value": 120
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Total Ops"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Total Ops",
+            "desc": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "Hot Files by Operation Type",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 16
+      },
+      "id": 30,
+      "targets": [
+        {
+          "format": 1,
+          "rawSQL": "WITH hot_files AS (\n  SELECT path.path AS fp\n  FROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\n  WHERE starts_with(path.path, '${dir_prefix}')\n    AND login_name <> 'audit'\n    AND not starts_with(path.path, '(null)')\n    AND not starts_with(path.path, '/.vast_audit_dir/')\n    AND time >= from_iso8601_timestamp('${__from:date}')\n    AND time <= from_iso8601_timestamp('${__to:date}')\n    AND starts_with(login_name, '${user_prefix:raw}')\n    AND starts_with(rpc_type, '${action_prefix}')\n    AND rpc_type NOT IN ('READDIR', 'READDIRPLUS', 'MKDIR', 'RMDIR')\n  GROUP BY path.path\n  ORDER BY COUNT(*) DESC\n  LIMIT ${topN}\n)\nSELECT a.rpc_type AS rpc_type, COUNT(*) AS count\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table a\nJOIN hot_files h ON a.path.path = h.fp\nWHERE a.time >= from_iso8601_timestamp('${__from:date}')\n  AND a.time <= from_iso8601_timestamp('${__to:date}')\nGROUP BY a.rpc_type\nORDER BY count DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "Hot Files by Protocol",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 16
+      },
+      "id": 31,
+      "targets": [
+        {
+          "format": 1,
+          "rawSQL": "WITH hot_files AS (\n  SELECT path.path AS fp\n  FROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\n  WHERE starts_with(path.path, '${dir_prefix}')\n    AND login_name <> 'audit'\n    AND not starts_with(path.path, '(null)')\n    AND not starts_with(path.path, '/.vast_audit_dir/')\n    AND time >= from_iso8601_timestamp('${__from:date}')\n    AND time <= from_iso8601_timestamp('${__to:date}')\n    AND starts_with(login_name, '${user_prefix:raw}')\n    AND starts_with(rpc_type, '${action_prefix}')\n    AND rpc_type NOT IN ('READDIR', 'READDIRPLUS', 'MKDIR', 'RMDIR')\n  GROUP BY path.path\n  ORDER BY COUNT(*) DESC\n  LIMIT ${topN}\n)\nSELECT a.protocol, COUNT(*) AS count\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table a\nJOIN hot_files h ON a.path.path = h.fp\nWHERE a.time >= from_iso8601_timestamp('${__from:date}')\n  AND a.time <= from_iso8601_timestamp('${__to:date}')\nGROUP BY a.protocol\nORDER BY count DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "Hot Files by User",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 16
+      },
+      "id": 32,
+      "targets": [
+        {
+          "format": 1,
+          "rawSQL": "WITH hot_files AS (\n  SELECT path.path AS fp\n  FROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\n  WHERE starts_with(path.path, '${dir_prefix}')\n    AND login_name <> 'audit'\n    AND not starts_with(path.path, '(null)')\n    AND not starts_with(path.path, '/.vast_audit_dir/')\n    AND time >= from_iso8601_timestamp('${__from:date}')\n    AND time <= from_iso8601_timestamp('${__to:date}')\n    AND starts_with(login_name, '${user_prefix:raw}')\n    AND starts_with(rpc_type, '${action_prefix}')\n    AND rpc_type NOT IN ('READDIR', 'READDIRPLUS', 'MKDIR', 'RMDIR')\n  GROUP BY path.path\n  ORDER BY COUNT(*) DESC\n  LIMIT ${topN}\n)\nSELECT IF(a.login_name!='', a.login_name, 'uid'||cast(a.uid as VARCHAR)) AS user,\n       COUNT(*) AS count\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table a\nJOIN hot_files h ON a.path.path = h.fp\nWHERE a.time >= from_iso8601_timestamp('${__from:date}')\n  AND a.time <= from_iso8601_timestamp('${__to:date}')\nGROUP BY IF(a.login_name!='', a.login_name, 'uid'||cast(a.uid as VARCHAR))\nORDER BY count DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 40,
+  "tags": [
+    "vast",
+    "audit-log",
+    "hot-files"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "vast",
+          "value": "vast"
+        },
+        "definition": "show catalogs",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Trino Catalog",
+        "multi": false,
+        "name": "trino_catalog",
+        "options": [],
+        "query": {
+          "query": "show catalogs",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "type": "query",
+        "regex": "/^(?!system|tpcds|information_schema).*/"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "25",
+          "value": "25"
+        },
+        "description": "Number of top files to display",
+        "hide": 0,
+        "label": "Top N",
+        "name": "topN",
+        "options": [
+          {
+            "selected": false,
+            "text": "10",
+            "value": "10"
+          },
+          {
+            "selected": true,
+            "text": "25",
+            "value": "25"
+          },
+          {
+            "selected": false,
+            "text": "50",
+            "value": "50"
+          },
+          {
+            "selected": false,
+            "text": "100",
+            "value": "100"
+          }
+        ],
+        "query": "10,25,50,100",
+        "type": "custom"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "description": "Filter by folder path prefix (e.g. /data/trading)",
+        "hide": 0,
+        "label": "Filename Prefix",
+        "name": "dir_prefix",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "description": "Filter by user login name prefix",
+        "hide": 0,
+        "label": "User Prefix",
+        "name": "user_prefix",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "type": "textbox"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "description": "Filter by action/RPC type prefix",
+        "hide": 0,
+        "label": "Action Prefix",
+        "name": "action_prefix",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "VAST Audit Log — Top N Hot Files",
+  "uid": "vast-hot-files",
+  "version": 1
+}

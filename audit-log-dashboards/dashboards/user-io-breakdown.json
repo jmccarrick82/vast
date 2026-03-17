@@ -1,0 +1,709 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [
+    {
+      "title": "Overview",
+      "url": "/d/vast-audit-overview",
+      "type": "link"
+    },
+    {
+      "title": "File Lineage",
+      "url": "/d/vast-file-lineage",
+      "type": "link"
+    },
+    {
+      "title": "Hot Files",
+      "url": "/d/vast-hot-files",
+      "type": "link"
+    }
+  ],
+  "panels": [
+    {
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "options": {
+        "mode": "markdown",
+        "content": "# User IO Breakdown\nComplete breakdown of all IO operations for a selected user. See what they accessed, when, how much data, and via which protocol."
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Total Operations",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 2
+      },
+      "id": 1,
+      "targets": [
+        {
+          "format": 0,
+          "rawSQL": "SELECT count(*)\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND starts_with(rpc_type, '${action_prefix}')",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Data Written / Read / Total",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 2
+      },
+      "id": 2,
+      "targets": [
+        {
+          "format": 0,
+          "rawSQL": "SELECT sum(num_bytes) as \"bytes\"\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND rpc_type IN ('WRITE', 'PUT_OBJECT')",
+          "refId": "Written"
+        },
+        {
+          "format": 0,
+          "rawSQL": "SELECT sum(num_bytes) as \"bytes\"\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND not rpc_type IN ('WRITE', 'PUT_OBJECT')",
+          "refId": "Read"
+        },
+        {
+          "format": 0,
+          "rawSQL": "SELECT sum(num_bytes) as \"bytes\"\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')",
+          "refId": "Total"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Files Touched",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 2
+      },
+      "id": 3,
+      "targets": [
+        {
+          "format": 0,
+          "rawSQL": "SELECT COUNT(DISTINCT path.path)\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND starts_with(rpc_type, '${action_prefix}')",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "type": "table",
+      "title": "User Activity — All Operations",
+      "gridPos": {
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 10,
+      "targets": [
+        {
+          "format": 1,
+          "rawSQL": "SELECT client_ip AS \"Client IP\",\n       IF(login_name!='', login_name, 'uid'||cast(uid as VARCHAR)) AS \"User\",\n       protocol AS \"Protocol\",\n       rpc_type AS \"RPC Type\",\n       path.path AS \"Filename\",\n       to_iso8601(time) AS \"Time\",\n       status AS \"Status\",\n       num_bytes AS \"Size\",\n       num_ops AS \"Operations\"\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND starts_with(rpc_type, '${action_prefix}')\nGROUP BY client_ip,\n         IF(login_name!='', login_name, 'uid'||cast(uid as VARCHAR)),\n         protocol, rpc_type, path.path, to_iso8601(time),\n         status, num_bytes, num_ops\nORDER BY time DESC\nLIMIT 1000",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Size"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "decbytes"
+              },
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Protocol"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Operations"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "displayName": "Time",
+            "desc": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "Operations Breakdown",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 30
+      },
+      "id": 30,
+      "targets": [
+        {
+          "format": 1,
+          "rawSQL": "SELECT rpc_type, COUNT(*) AS count\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND starts_with(rpc_type, '${action_prefix}')\nGROUP BY rpc_type\nORDER BY count DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "type": "piechart",
+      "title": "Protocol Usage",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 30
+      },
+      "id": 31,
+      "targets": [
+        {
+          "format": 1,
+          "rawSQL": "SELECT protocol, COUNT(*) AS count\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND starts_with(rpc_type, '${action_prefix}')\nGROUP BY protocol\nORDER BY count DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Data Written by Extension",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 30
+      },
+      "id": 32,
+      "targets": [
+        {
+          "format": 1,
+          "rawSQL": "SELECT element_at(split(path.path, '.'), -1) as \"Extension\",\n       sum(num_bytes) as \"bytes\"\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND rpc_type IN ('WRITE', 'PUT_OBJECT')\n  AND strpos(path.path, '.') > 0\n  AND num_bytes > 0\nGROUP BY element_at(split(path.path, '.'), -1)\nORDER BY sum(num_bytes) DESC",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decbytes",
+          "custom": {
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Extension"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "string"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "cellHeight": "sm",
+        "showHeader": true
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Top Accessed Files",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 38
+      },
+      "id": 40,
+      "targets": [
+        {
+          "format": 1,
+          "rawSQL": "SELECT path.path AS file_path,\n       COUNT(*) AS ops\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND starts_with(rpc_type, '${action_prefix}')\n  AND rpc_type NOT IN ('READDIR', 'READDIRPLUS', 'MKDIR', 'RMDIR')\nGROUP BY path.path\nORDER BY ops DESC\nLIMIT 15",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "barWidth": 0.8,
+        "groupWidth": 0.7,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Top Directories by Activity",
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 38
+      },
+      "id": 41,
+      "targets": [
+        {
+          "format": 1,
+          "rawSQL": "SELECT element_at(split(path.path, '/'), -2) AS directory,\n       COUNT(*) AS ops\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND starts_with(rpc_type, '${action_prefix}')\nGROUP BY element_at(split(path.path, '/'), -2)\nORDER BY ops DESC\nLIMIT 15",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "barWidth": 0.8,
+        "groupWidth": 0.7,
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        },
+        "orientation": "horizontal",
+        "showValue": "always",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Avg Ops/Sec Over Time by IO Type",
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
+      "id": 70,
+      "targets": [
+        {
+          "format": 0,
+          "rawSQL": "SELECT\n  date_trunc('minute', time) - (extract(minute from time) % 5) * interval '1' minute as time,\n  ROUND(CAST(SUM(CASE WHEN rpc_type IN ('READ', 'READDIR', 'READDIRPLUS', 'GET_OBJECT') THEN 1 ELSE 0 END) AS DOUBLE) / 300, 2) as \"Read\",\n  ROUND(CAST(SUM(CASE WHEN rpc_type IN ('WRITE', 'PUT_OBJECT') THEN 1 ELSE 0 END) AS DOUBLE) / 300, 2) as \"Write\",\n  ROUND(CAST(SUM(CASE WHEN rpc_type IN ('CREATE', 'MKDIR', 'MKNOD') THEN 1 ELSE 0 END) AS DOUBLE) / 300, 2) as \"Create\",\n  ROUND(CAST(SUM(CASE WHEN rpc_type IN ('DELETE', 'REMOVE', 'UNLINK', 'RMDIR', 'DELETE_OBJECT') THEN 1 ELSE 0 END) AS DOUBLE) / 300, 2) as \"Delete\",\n  ROUND(CAST(SUM(CASE WHEN rpc_type IN ('RENAME') THEN 1 ELSE 0 END) AS DOUBLE) / 300, 2) as \"Rename\",\n  ROUND(CAST(SUM(CASE WHEN rpc_type IN ('LOOKUP', 'GETATTR', 'ACCESS', 'READLINK', 'SETATTR') THEN 1 ELSE 0 END) AS DOUBLE) / 300, 2) as \"Metadata\",\n  ROUND(CAST(SUM(CASE WHEN rpc_type NOT IN ('READ','READDIR','READDIRPLUS','GET_OBJECT','WRITE','PUT_OBJECT','CREATE','MKDIR','MKNOD','DELETE','REMOVE','UNLINK','RMDIR','DELETE_OBJECT','RENAME','LOOKUP','GETATTR','ACCESS','READLINK','SETATTR') THEN 1 ELSE 0 END) AS DOUBLE) / 300, 2) as \"Other\"\nFROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table\nWHERE starts_with(path.path, '${dir_prefix}')\n  AND login_name <> 'audit'\n  AND not starts_with(path.path, '(null)')\n  AND not starts_with(path.path, '/.vast_audit_dir/')\n  AND time >= from_iso8601_timestamp('${__from:date}')\n  AND time <= from_iso8601_timestamp('${__to:date}')\n  AND starts_with(login_name, '${user_prefix:raw}')\n  AND starts_with(rpc_type, '${action_prefix}')\nGROUP BY date_trunc('minute', time) - (extract(minute from time) % 5) * interval '1' minute\nORDER BY 1",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Operations",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 40,
+  "tags": [
+    "vast",
+    "audit-log",
+    "user-io"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "vast",
+          "value": "vast"
+        },
+        "definition": "show catalogs",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Trino Catalog",
+        "multi": false,
+        "name": "trino_catalog",
+        "options": [],
+        "query": {
+          "query": "show catalogs",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "type": "query",
+        "regex": "/^(?!system|tpcds|information_schema).*/"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "description": "Filter by directory/filename prefix",
+        "hide": 0,
+        "label": "Filename Prefix",
+        "name": "dir_prefix",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "type": "textbox"
+      },
+      {
+        "current": {},
+        "definition": "SELECT DISTINCT login_name FROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table WHERE login_name <> 'audit' AND login_name IS NOT NULL AND login_name <> '' AND not starts_with(path.path, '(null)') AND not starts_with(path.path, '/.vast_audit_dir/') ORDER BY login_name",
+        "description": "Select a user to view their IO breakdown",
+        "hide": 0,
+        "includeAll": true,
+        "label": "User",
+        "multi": false,
+        "name": "user_prefix",
+        "options": [],
+        "query": {
+          "query": "SELECT DISTINCT login_name FROM ${trino_catalog}.\"vast-audit-log-bucket/vast_audit_log_schema\".vast_audit_log_table WHERE login_name <> 'audit' AND login_name IS NOT NULL AND login_name <> '' AND not starts_with(path.path, '(null)') AND not starts_with(path.path, '/.vast_audit_dir/') ORDER BY login_name",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "type": "query",
+        "allValue": ""
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "description": "Filter by action/RPC type prefix",
+        "hide": 0,
+        "label": "Action Prefix",
+        "name": "action_prefix",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "VAST Audit Log — User IO Breakdown",
+  "uid": "vast-user-io",
+  "version": 1
+}
